@@ -13,48 +13,139 @@ let pop  reg = addi sp sp 4 @@ lw reg 0 sp
    Rappel de la convention : le code généré par [translate_expression e] doit
    placer la valeur de l'expression [e] au sommet de la pile.
 *)
-and translate_expression (e: GotoAST.expression) =
-    |GotoAST.Literal(l) ->
-       li t0 l
-       @@ push t0
-    |GotoAST.Location(l) ->
-       
-    |GotoAST.UnaryOP(o,e) ->
-       match o with
-       | Minus ->
-	  translate_expression(e)
-	  @@ pop t0
-	  @@ subi t0, 0, t0
+
+let translate_location = function
+  |GotoAST.Identifier(Id l) -> 
+     la t0 l
+     @@ lw t0 0 t0
+     @@ push t0
+  
+let rec translate_expression (e: GotoAST.expression) = match e with
+  |Literal(l) ->
+     begin
+       match l with
+       |Int i -> 
+	  li t0 i
 	  @@ push t0
-       | Not -> 
-	  translate_expression(e)
+       |Bool b ->
+	  if b then
+	    li t0 (-1)
+	    @@ push t0
+	  else
+	    li t0 0
+	    @@ push t0
+     end
+  |Location(l) ->
+     translate_location l
+  |UnaryOp(o,e) ->
+     begin
+       translate_expression e;
+       match o with
+       | Minus ->	    
+	  pop t0
+	  @@ neg t0 t0
+	  @@ push t0
+       | Not ->
+	  pop t0
+	  @@ not_ t0 t0
+	  @@ push t0
+     end
+  |BinaryOp(o,e1,e2) ->
+     begin
+       translate_expression e1;
+       translate_expression e2;
+       match o with
+       | Add ->
+	  pop t1
 	  @@ pop t0
-	  @@ not_ t0, t0
-    |GotoAST.BinaryOP ->
-       
+	  @@ add t0 t0 t1
+	  @@ push t0
+       | Sub ->
+	  pop t1
+	  @@ pop t0
+	  @@ sub t0 t0 t1
+	  @@ push t0
+       | Mult ->
+	  pop t1
+	  @@ pop t0
+	  @@ mul t0 t0 t1
+	  @@ push t0
+       | Div ->
+	  pop t1
+	  @@ pop t0
+	  @@ div t0 t0 t1
+	  @@ push t0
+       | Mod ->
+	  pop t1
+	  @@ pop t0
+	  @@ rem t0 t0 t1
+	  @@ push t0
+       | Eq ->
+	  pop t1
+	  @@ pop t0
+	  @@ seq t0 t0 t1
+	  @@ push t0
+       | Neq ->
+	  pop t1
+	  @@ pop t0
+	  @@ sne t0 t0 t1
+	  @@ push t0
+       | Lt ->
+	  pop t1
+	  @@ pop t0
+	  @@ slt t0 t0 t1
+	  @@ push t0
+       | Le ->
+	  pop t1
+	  @@ pop t0
+	  @@ sle t0 t0 t1
+	  @@ push t0
+       | Gt ->
+	  pop t1
+	  @@ pop t0
+	  @@ sgt t0 t0 t1
+	  @@ push t0
+       | Ge ->
+	  pop t1
+	  @@ pop t0
+	  @@ sge t0 t0 t1
+	  @@ push t0
+       | And ->
+	  pop t1
+	  @@ pop t0
+	  @@ and_ t0 t0 t1
+	  @@ push t0
+       | Or ->
+	  pop t1
+	  @@ pop t0
+	  @@ or_ t0 t0 t1
+	  @@ push t0
+     end
 (**
    Fonction de traduction des instructions.
    [translate_instruction : GotoAST.instruction -> Mips.text]
 *)
 let rec translate_instruction (i: GotoAST.instruction) = match i with
-  | GotoAST.Sequence(i1,i2) ->
+  | Sequence(i1,i2) ->
      translate_instruction(i1)
      @@ translate_instruction(i2)
-  | GotoAST.Print(e) ->
+  | Print(e) ->
      translate_expression(e)
      @@ pop t0
      @@ move a0 t0
      @@ li v0 1
      @@ syscall
-  | GotoAST.Set(l,e) ->
-     translate_expression(e)
+  | Set(l,e) ->
+     translate_expression e
+     @@ translate_location l
      @@ pop t0
-     @@ move translate_location(l) t0
-  | GotoAST.Label(l) ->
+     @@ pop t1
+     @@ sw t1 0 t0
+  | Label(Lab l) ->
      label l
-  | GotoAST.Goto(l) ->
+  | Goto(Lab l) ->
      jr l
-  | GotoAST.ConditionalGoto(l,e) ->
+  | ConditionalGoto(Lab l,e) ->
       translate_expression(e)
      @@ pop t0
      @@ bltz t0 l
