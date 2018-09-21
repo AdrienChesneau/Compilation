@@ -14,13 +14,50 @@ let pop  reg = addi sp sp 4 @@ lw reg 0 sp
    placer la valeur de l'expression [e] au sommet de la pile.
 *)
 and translate_expression (e: GotoAST.expression) =
-  failwith "Not implemented"
-
+    |GotoAST.Literal(l) ->
+       li t0 l
+       @@ push t0
+    |GotoAST.Location(l) ->
+       
+    |GotoAST.UnaryOP(o,e) ->
+       match o with
+       | Minus ->
+	  translate_expression(e)
+	  @@ pop t0
+	  @@ subi t0, 0, t0
+	  @@ push t0
+       | Not -> 
+	  translate_expression(e)
+	  @@ pop t0
+	  @@ not_ t0, t0
+    |GotoAST.BinaryOP ->
+       
 (**
    Fonction de traduction des instructions.
    [translate_instruction : GotoAST.instruction -> Mips.text]
 *)
-let rec translate_instruction (i: GotoAST.instruction) = match i with   
+let rec translate_instruction (i: GotoAST.instruction) = match i with
+  | GotoAST.Sequence(i1,i2) ->
+     translate_instruction(i1)
+     @@ translate_instruction(i2)
+  | GotoAST.Print(e) ->
+     translate_expression(e)
+     @@ pop t0
+     @@ move a0 t0
+     @@ li v0 1
+     @@ syscall
+  | GotoAST.Set(l,e) ->
+     translate_expression(e)
+     @@ pop t0
+     @@ move translate_location(l) t0
+  | GotoAST.Label(l) ->
+     label l
+  | GotoAST.Goto(l) ->
+     jr l
+  | GotoAST.ConditionalGoto(l,e) ->
+      translate_expression(e)
+     @@ pop t0
+     @@ bltz t0 l
   | Nop -> nop
 
 
